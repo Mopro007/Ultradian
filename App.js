@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { SafeAreaView, Text, StyleSheet, TouchableOpacity, View, ImageBackground, Linking, Button} from 'react-native';
+import { Text, StyleSheet, TouchableOpacity, View, ImageBackground, Linking } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
-import PushNotification from 'react-native-push-notification';
+import { Audio } from 'expo-av';
 
 export default function App() {
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
@@ -13,6 +13,7 @@ export default function App() {
   const [trackingStarted, setTrackingStarted] = useState(false);
   const [remainingTime, setRemainingTime] = useState(null);
   const [secondsCounter, setSecondsCounter] = useState(60);
+  const [sound, setSound] = useState();
 
   const showDatePicker = () => {
     setDatePickerVisible(true);
@@ -57,10 +58,11 @@ export default function App() {
         cursor = trough[1]
         rythm.push([peak,trough])
       }
+      console.log(rythm);
       setRythm(rythm);
-      setCurrentTime(new Date().getHours()*60 + new Date().getMinutes());
       whichCycle(rythm);
       setTrackingStarted(true);
+      setCurrentTime(new Date().getHours()*60 + new Date().getMinutes());
     }
     else{
       alert("Please select a wake-up time");
@@ -79,31 +81,35 @@ export default function App() {
     setSecondsCounter(60);
   };
 
+  async function playSound() {
+    if (sound) {
+      console.log("there's a sound!");
+      await sound.replayAsync(); // Use replayAsync() to play the sound.
+      console.log("sound played!");
+    }
+  };
+
   const reFreshRemaining = () => {
     if (currentTime !== null && currentCycle !== null ) {
       let remaining = null;
       if (currentCycle[0][0] <= currentTime && currentCycle[0][1] >= currentTime) {remaining = currentCycle[0][1] - currentTime; setIsBreakTime(false); console.log("remaining variable refreshed!");}
       if (currentCycle[1][0] <= currentTime && currentCycle[1][1] >= currentTime) {remaining = currentCycle[1][1] - currentTime; setIsBreakTime(true); console.log("remaining variable refreshed!");}
       if (remaining === 0) {
-        if (isBreakTime) {
-          PushNotification.localNotification({
-            title: "Break Time!",
-            message: "You can take a break now",
-            soundName: "./assets/sounds/alarm.mp3",
-          });
-        }
-        if (!isBreakTime) {
-          PushNotification.localNotification({
-            title: "Back to Work!",
-            message: "Your break is over",
-            soundName: "./assets/sounds/alarm.mp3",
-          });
-        }
+        playSound();
         whichCycle(rythm);
       };
       setRemainingTime(remaining);
     };
   };
+
+  useEffect(() => {
+    (async () => {
+      const sound = await Audio.Sound.createAsync(
+        require('./assets/audio/hello.mp3')
+      );
+      setSound(sound);
+    });
+  },[]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -118,7 +124,7 @@ export default function App() {
       setSecondsCounter(secondsCounter-1);
     }, 1000);
     return () => clearInterval(interval);
-    });
+    },[]);
 
   useEffect(() => {
     if(trackingStarted){
@@ -138,6 +144,7 @@ export default function App() {
       {remainingTime && ( <Text style={styles.breakOrPeak}>until next {isBreakTime ? 'Peak' : 'Break'}</Text> )}
       {trackingStarted && ( <TouchableOpacity onPress={stopTracking}><View style={styles.Button}><Text>Stop Tracking</Text></View></TouchableOpacity>)}
       <TouchableOpacity onPress={() => Linking.openURL('https://mopro007.pythonanywhere.com/')} style={styles.rights}><Text style={styles.rights}>Developed by Moe Hasan</Text></TouchableOpacity>
+      <TouchableOpacity onPress={playSound} style={styles.Button}><Text>Play sound</Text></TouchableOpacity>
     </ImageBackground>
   );
 }
