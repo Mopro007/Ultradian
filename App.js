@@ -7,8 +7,8 @@ export default function App() {
   const [isDatePickerVisible, setDatePickerVisible] = useState(false);
   const [selectedTime, setSelectedTime] = useState(null);
   const [isBreakTime, setIsBreakTime] = useState(false);
-  const [rythm, setRythm] = useState(null);
-  const [currentCycle, setCurrentCycle] = useState(0);
+  const [rythm, setRythm] = useState([]);
+  const [currentCycle, setCurrentCycle] = useState(null);
   const [currentTime, setCurrentTime] = useState(null);
   const [trackingStarted, setTrackingStarted] = useState(false);
   const [remainingTime, setRemainingTime] = useState(null);
@@ -29,26 +29,31 @@ export default function App() {
   };
 
   const whichCycle = (rythm) => {
+    alert("alerting from the begining of the whichCycle() function... \nrythm : "+rythm+"\ncurrent cycle"+currentCycle+"\ncurrent time: "+currentTime+"\nremaining time: "+remainingTime);
     let current_time = new Date().getHours()*60 + new Date().getMinutes();
-    let closestCycle = null;
-    let minDifference = Number.POSITIVE_INFINITY;
-    for (const cycle of rythm) {
-      for (const period of cycle) {
-        for (const limit of period) {
-          const difference = Math.abs(current_time - limit);
-          if (difference < minDifference) {
-            minDifference = difference;
-            closestCycle = cycle;
-          }
-        }
-      }
-    }
-    setCurrentCycle(closestCycle);
-  }
+    for (let i = 0; i < 13; i++) {
+      for (let j = 0; j < 2; j++) {
+        const range = rythm[i][j];
+        if (current_time >= range[0] && current_time <= range[1]) {
+          setCurrentCycle(rythm[i]);
+        };
+      };
+    };
+    alert("alerting from the end of the whichCycle() function... \nrythm : "+rythm+"\ncurrent cycle"+currentCycle+"\ncurrent time: "+currentTime+"\nremaining time: "+remainingTime);
+  };
+
+  const nextCycle = (currentCycle) => {
+    const peakLawerLimit = currentCycle[1][1];
+    const peakHigherLimit = peakLawerLimit + 90;
+    const troughLawerLimit = peakHigherLimit;
+    const troughHigherLimit = troughLawerLimit + 20;
+    const nxtCycle = [[peakLawerLimit,peakHigherLimit],[troughLawerLimit,troughHigherLimit]];
+    setCurrentCycle(nxtCycle);
+  };
 
   const startTracking = () => {
     if (selectedTime) {
-      console.log("tracking started!");
+      console.log("tracking started...");
       const rythm = [];
       let cursor = new Date(selectedTime).getHours()*60 + new Date(selectedTime).getMinutes();
       for (let cycle = 0; cycle < 13 ; cycle++) {
@@ -74,7 +79,7 @@ export default function App() {
     setTrackingStarted(false);
     setSelectedTime(null);
     setCurrentTime(null);
-    setRythm(null);
+    setRythm([]);
     setCurrentCycle(null);
     setIsBreakTime(false);
     setRemainingTime(null);
@@ -82,34 +87,26 @@ export default function App() {
   };
 
   async function playSound() {
-    if (sound) {
-      console.log("there's a sound!");
-      await sound.replayAsync(); // Use replayAsync() to play the sound.
-      console.log("sound played!");
-    }
+    const { sound } = await Audio.Sound.createAsync( require('./assets/audio/hello.mp3'));
+    setSound(sound);
+    await sound.playAsync();
   };
 
   const reFreshRemaining = () => {
+    alert("alerting from the begining of the refreshRemaining() function... \nrythm : "+rythm+"\ncurrent cycle"+currentCycle+"\ncurrent time: "+currentTime+"\nremaining time: "+remainingTime);
     if (currentTime !== null && currentCycle !== null ) {
       let remaining = null;
-      if (currentCycle[0][0] <= currentTime && currentCycle[0][1] >= currentTime) {remaining = currentCycle[0][1] - currentTime; setIsBreakTime(false); console.log("remaining variable refreshed!");}
-      if (currentCycle[1][0] <= currentTime && currentCycle[1][1] >= currentTime) {remaining = currentCycle[1][1] - currentTime; setIsBreakTime(true); console.log("remaining variable refreshed!");}
+      if (currentCycle[0][0] <= currentTime && currentCycle[0][1] >= currentTime) {remaining = currentCycle[0][1] - currentTime; console.log("remaining variable refreshed... remaining time: "+remaining);}
+      if (currentCycle[1][0] <= currentTime && currentCycle[1][1] >= currentTime) {remaining = currentCycle[1][1] - currentTime; console.log("remaining variable refreshed... remaining time: "+remaining);}
       if (remaining === 0) {
+        if(isBreakTime){nextCycle(currentCycle)};
+        setIsBreakTime(!isBreakTime);
         playSound();
-        whichCycle(rythm);
       };
       setRemainingTime(remaining);
     };
+    alert("alerting from the end of the refreshRemaining() function... \nrythm : "+rythm+"\ncurrent cycle"+currentCycle+"\ncurrent time: "+currentTime+"\nremaining time: "+remainingTime);
   };
-
-  useEffect(() => {
-    (async () => {
-      const sound = await Audio.Sound.createAsync(
-        require('./assets/audio/hello.mp3')
-      );
-      setSound(sound);
-    });
-  },[]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -124,7 +121,7 @@ export default function App() {
       setSecondsCounter(secondsCounter-1);
     }, 1000);
     return () => clearInterval(interval);
-    },[]);
+    },);
 
   useEffect(() => {
     if(trackingStarted){
@@ -136,15 +133,14 @@ export default function App() {
   return (
     <ImageBackground source={require('./assets/images/first.jpg')} style={styles.container}>
       <Text style={styles.header}>Ultradian</Text>
-      {!trackingStarted && (<TouchableOpacity onPress={showDatePicker}><View style={styles.Button}><Text>Set Wake-Up Time</Text></View></TouchableOpacity>)}
-      {!trackingStarted && (<DateTimePickerModal isVisible={isDatePickerVisible} mode="time" onConfirm={handleConfirm} onCancel={hideDatePicker} />)}
-      {!trackingStarted && ( <TouchableOpacity onPress={startTracking}><View style={styles.Button}><Text>Start Tracking</Text></View></TouchableOpacity> )}
-      {!trackingStarted && selectedTime && ( <Text style={styles.selectedTime}>Selected Wake-Up Time: {selectedTime.toLocaleTimeString()}</Text> )}
-      {remainingTime && ( <Text style={styles.remainingTime}>{remainingTime}:{secondsCounter}</Text> )}
-      {remainingTime && ( <Text style={styles.breakOrPeak}>until next {isBreakTime ? 'Peak' : 'Break'}</Text> )}
-      {trackingStarted && ( <TouchableOpacity onPress={stopTracking}><View style={styles.Button}><Text>Stop Tracking</Text></View></TouchableOpacity>)}
+      {trackingStarted === false ? (<TouchableOpacity onPress={showDatePicker}><View style={styles.Button}><Text>Set Wake-Up Time</Text></View></TouchableOpacity>) : null}
+      {trackingStarted === false ? (<DateTimePickerModal isVisible={isDatePickerVisible} mode="time" onConfirm={handleConfirm} onCancel={hideDatePicker} />) : null}
+      {trackingStarted === false ? ( <TouchableOpacity onPress={startTracking}><View style={styles.Button}><Text>Start Tracking</Text></View></TouchableOpacity> ) : null}
+      {trackingStarted === false ? selectedTime && ( <Text style={styles.selectedTime}>Selected Wake-Up Time: {selectedTime.toLocaleTimeString()}</Text> ) : null}
+      {remainingTime !== null ? ( <Text style={styles.remainingTime}>{remainingTime}:{secondsCounter}</Text> ) : null}
+      {remainingTime !== null ? ( <Text style={styles.breakOrPeak}>until next {isBreakTime ? 'Peak' : 'Break'}</Text> ) : null}
+      {trackingStarted === true ? ( <TouchableOpacity onPress={stopTracking}><View style={styles.Button}><Text>Stop Tracking</Text></View></TouchableOpacity>) : null}
       <TouchableOpacity onPress={() => Linking.openURL('https://mopro007.pythonanywhere.com/')} style={styles.rights}><Text style={styles.rights}>Developed by Moe Hasan</Text></TouchableOpacity>
-      <TouchableOpacity onPress={playSound} style={styles.Button}><Text>Play sound</Text></TouchableOpacity>
     </ImageBackground>
   );
 }
